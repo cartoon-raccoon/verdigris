@@ -1,1 +1,42 @@
 Verdigris: An interpreted programming language based on Rust, implemented in Rust
+
+features:
+- structs:
+    struct Name {
+        field: type,
+        field: type,
+        ...
+    }
+    impl name {
+        #associated fn
+        fxn name(args)...
+
+        #struct methods must take self as a first param
+        fxn name(self, args)...
+    }
+
+- functions:
+    fxn name(args) -> return {}
+
+- closures:
+    let closure = |args| {}
+
+- enums:
+    enum Name {
+        Variant1,
+        Variant2,
+        Variant3,
+    }
+
+- traits
+    trait Name {
+        fxn name(args) -> Type {}
+    }
+
+- nil type
+- error struct
+    implemented as a struct or enum implementing the error trait
+
+while and for loops, conditional statements, etc.
+
+any code not in a function gets directly executed (like python)
