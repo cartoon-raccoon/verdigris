@@ -40,3 +40,7 @@ features:
 while and for loops, conditional statements, etc.
 
 any code not in a function gets directly executed (like python)
+
+VM Notes:
+
+Add support for distinguishing between literals and pointers as opcode operands
