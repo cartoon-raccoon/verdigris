@@ -7,6 +7,7 @@ pub struct VM {
     heap: Vec<u8>,
     pc: usize,
     remainder: i32,
+    eq: bool,
 }
 
 impl VM {
@@ -17,6 +18,7 @@ impl VM {
             heap: Vec::new(),
             pc: 0,
             remainder: 0,
+            eq: false,
         }
     }
 
@@ -39,6 +41,47 @@ impl VM {
                 let register = self.next_8_bits() as usize;
                 let value = self.next_16_bits() as i32;
                 self.registers[register] = value;
+
+                Ok(false)
+            }
+            Opcode::Jmp => {
+                let target = self.registers[self.next_8_bits() as usize];
+                self.pc = target as usize;
+
+                Ok(false)
+            }
+            Opcode::Jpf => {
+                let target = self.registers[self.next_8_bits() as usize];
+                self.pc += target as usize;
+
+                Ok(false)
+            }
+            Opcode::Jpb => {
+                let target = self.registers[self.next_8_bits() as usize];
+                self.pc -= target as usize;
+
+                Ok(false)
+            }
+            Opcode::Cmp => {
+                let lhs = self.registers[self.next_8_bits() as usize];
+                let rhs = self.registers[self.next_8_bits() as usize];
+                self.eq = lhs == rhs;
+
+                Ok(false)
+            }
+            Opcode::Jeq => {
+                let target = self.registers[self.next_8_bits() as usize];
+                if self.eq {
+                    self.pc = target as usize;
+                }
+
+                Ok(false)
+            }
+            Opcode::Jne => {
+                let target = self.registers[self.next_8_bits() as usize];
+                if !self.eq {
+                    self.pc = target as usize;
+                }
 
                 Ok(false)
             }
@@ -68,12 +111,6 @@ impl VM {
                 let reg2 = self.registers[self.next_8_bits() as usize];
                 self.registers[self.next_8_bits() as usize] = reg1 / reg2;
                 self.remainder = reg1 % reg2;
-
-                Ok(false)
-            }
-            Opcode::Jmp => {
-                let target = self.registers[self.next_8_bits() as usize];
-                self.pc = target as usize;
 
                 Ok(false)
             }
@@ -144,6 +181,7 @@ mod tests {
             heap: vec![],
             pc: 0,
             remainder: 0,
+            eq: false,
             }, 
             test_vm)
     }
@@ -177,7 +215,7 @@ mod tests {
         u16_to_little_endian(250, &mut test_code);
 
         // add $0x01 $0x02 $0x03
-        test_code.extend(vec![0x07, 0x01, 0x02, 0x03]);
+        test_code.extend(vec![0x0a, 0x01, 0x02, 0x03]);
 
         // hlt
         test_code.push(0x00);
