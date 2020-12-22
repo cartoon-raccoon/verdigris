@@ -3,8 +3,18 @@ name = "verdigris"
 version = "0.1.0"
 authors = ["cartoon-raccoon <shaughn.chan@gmail.com>"]
 edition = "2018"
+description = "The interpreter for the Verdigris programming language"
+license = "MIT"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+vdg-oxidizer = {path = "./vdg-oxidizer"}
+
 linefeed = "0.6.0"
+
+[workspace]
+
+members = [
+    "vdg-oxidizer"
+]
