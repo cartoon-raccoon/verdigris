@@ -8,3 +8,4 @@ license = "MIT"
 
 [dependencies]
 linefeed = "0.6.0"
+byteorder = "1.3.4"
