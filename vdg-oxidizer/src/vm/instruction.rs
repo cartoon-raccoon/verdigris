@@ -4,8 +4,8 @@ pub enum Opcode {
     Hlt,  // Halt execution
     Mov,  // Load register
     Jmp,  // Jump to a location in program
-    Jpf,  // Jump forward by x bytes
-    Jpb,  // Jump backward by x bytes
+    Jmpf, // Jump forward by x bytes
+    Jmpb, // Jump backward by x bytes
     Cmp,  // Compare and set flag if equal
     Lt,   // Compare and set flag if lhs < rhs
     Gt,   // Compare and set flag if lhs > rhs
@@ -28,8 +28,8 @@ impl From<u8> for Opcode {
             0x00 => Opcode::Hlt,
             0x01 => Opcode::Mov,
             0x02 => Opcode::Jmp,
-            0x03 => Opcode::Jpf,
-            0x04 => Opcode::Jpb,
+            0x03 => Opcode::Jmpf,
+            0x04 => Opcode::Jmpb,
             0x05 => Opcode::Cmp,
             0x06 => Opcode::Lt,
             0x07 => Opcode::Gt,
@@ -48,12 +48,15 @@ impl From<u8> for Opcode {
     }
 }
 
+pub type InvalidOperandsErr = (u32, u32);
+
+#[allow(dead_code)]
+// Not sure what to do with this yet???
 pub struct Instruction {
     inst: Opcode,
     operands: Vec<u8>,
 }
 
-pub type InvalidOperandsErr = (u32, u32);
 
 impl Instruction {
     pub fn new(byte: u8) -> Self {
@@ -63,7 +66,10 @@ impl Instruction {
         }
     }
 
-    pub fn from_opcode(op: Opcode) -> Result<Self, InvalidOperandsErr> {
+    pub fn from_opcode(opcode: Opcode, ) -> Result<Self, InvalidOperandsErr> {
+        match opcode {
+            _ => {}
+        }
         unimplemented!()
     }
 }

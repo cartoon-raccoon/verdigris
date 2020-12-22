@@ -1,0 +1,32 @@
+REG: Register, denoted with $
+PLT: Pointer to memory, denoted with &
+LIT: Literal value, no sigil
+
+hlt  none
+mov  [REG] [LIT|PTR]
+jmp  [LIT|PTR|LAB]
+jmpf [LIT]
+jmpb [LIT]
+cmp  [REG|LIT] [REG|LIT]
+lt   [REG|LIT] [REG|LIT]
+gt   ""
+le   ""
+ge   ""
+jeq  [LIT|PTR|LAB]
+jne  ""
+aloc [LIT]
+dalc [LIT]
+add  [REG|LIT] [REG|LIT]
+sub  ""
+mul  ""
+div  ""
+igl  none
+
+How registers, pointers and literals are denoted in memory
+1. VM reads opcode
+2. VM gets next byte from program
+3. byte value:
+    0 -> literal
+    1 -> pointer
+    2 -> register
+    _ -> (throws error)

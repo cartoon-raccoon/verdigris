@@ -1,3 +1,6 @@
+use std::convert::TryInto;
+use byteorder::*;
+
 use crate::vm::instruction::Opcode;
 
 #[derive(Debug, PartialEq, Clone)]
@@ -27,6 +30,10 @@ impl VM {
         Ok(())
     }
 
+    pub fn run_once(&mut self) -> Result<bool, ()> {
+        self.execute()
+    }
+
     #[inline]
     fn execute(&mut self) -> Result<bool, ()> {
         if self.pc >= self.program.len() {
@@ -38,9 +45,13 @@ impl VM {
                 Ok(true)
             }
             Opcode::Mov => { //todo: enable support for pointers
-                //let flag = self.next_8_bits() as usize;
                 let register = self.next_8_bits() as usize;
-                let value = self.next_16_bits() as i32;
+                let flag = self.next_8_bits() as usize;
+                let value = if flag == 0 {
+                    self.read_int()
+                } else {
+                    unimplemented!()
+                };
                 self.registers[register] = value;
 
                 Ok(false)
@@ -51,13 +62,13 @@ impl VM {
 
                 Ok(false)
             }
-            Opcode::Jpf => {
+            Opcode::Jmpf => {
                 let target = self.registers[self.next_8_bits() as usize];
                 self.pc += target as usize;
 
                 Ok(false)
             }
-            Opcode::Jpb => {
+            Opcode::Jmpb => {
                 let target = self.registers[self.next_8_bits() as usize];
                 self.pc -= target as usize;
 
@@ -179,10 +190,27 @@ impl VM {
         res
     }
 
+    fn read_int(&mut self) -> i32 {
+        let buf: [u8; 4] = self.program[self.pc..self.pc + 4].try_into().unwrap();
+        self.pc += 4;
+        LittleEndian::read_i32(&buf)
+    }
+
+    fn i32_to_bytes(&self, num: i32) -> [u8; 4] {
+        let mut buf: [u8; 4] = [0, 0, 0, 0];
+        buf.as_mut().write_i32::<LittleEndian>(num).unwrap();
+
+        buf
+    }
+
+    pub fn add_bytes(&mut self, bytes: Vec<u8>) {
+        self.program.extend(bytes);
+    }
+
     pub fn dump_registers(&self) {
         println!("Register dump for Oxidizer VM");
-        for i in 1..=32 {
-            println!("{}: {}", i, self.registers[i-1]);
+        for i in 0..32 {
+            println!("{:02}: {}", i, self.registers[i]);
         }
         println!("End of register dump")
     }
@@ -201,21 +229,11 @@ impl VM {
 
         Ok(self.registers[reg])
     }
-
-    #[cfg(test)]
-    pub fn run_once(&mut self) {
-        self.execute().unwrap();
-    }
 }
 
-enum Eq {
-    Eq,
-    Ne,
-    Lt,
-    Gt,
-    Le,
-    Ge,
-    No,
+pub enum VMError {
+    IglOpcode,
+    SegFault,
 }
 
 #[cfg(test)]

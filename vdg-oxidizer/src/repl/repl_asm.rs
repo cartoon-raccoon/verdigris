@@ -3,6 +3,7 @@ use linefeed::{
     terminal::DefaultTerminal,
     reader::ReadResult,
 };
+use byteorder::*;
 use std::io;
 use std::fmt;
 
@@ -39,8 +40,13 @@ impl Repl {
                                 self.exec_cmd(cmd);
                                 continue
                             }
-                            Executable::Instruction => {
-                                unimplemented!()
+                            Executable::Instruction(bytes) => {
+                                self.vm.add_bytes(bytes);
+                                if let Ok(done) = self.vm.run_once() {
+                                    if done {
+                                        std::process::exit(0)
+                                    } 
+                                }
                             }
                         }
                     } else {continue}
@@ -55,31 +61,29 @@ impl Repl {
 
     fn read_line(&mut self) -> Result<Option<Executable>, AsmLexErr> {
         if let ReadResult::Input(line) = self.interface.read_line()? {
-            if let Some(exec) = self.lexer.parse(&line.to_lowercase())? {
+            self.interface.add_history(line.clone());
+            if let Some(exec) = self.lexer.parse(line.to_lowercase())? {
                 return Ok(Some(exec))
             }
         }
         return Ok(None)
     }
 
-    fn exec_cmd(&self, cmd: ReplAsmCmd) {
+    fn exec_cmd(&self, cmd: ReplCmd) {
         match cmd {
-            ReplAsmCmd::Registers => {
+            ReplCmd::Registers => {
                 self.vm.dump_registers();
             }
-            ReplAsmCmd::History => {
-                unimplemented!()
-            }
-            ReplAsmCmd::Program => {
+            ReplCmd::Program => {
                 self.vm.dump_program();
             }
-            ReplAsmCmd::Help => {
+            ReplCmd::Help => {
                 unimplemented!()
             }
-            ReplAsmCmd::Info => {
+            ReplCmd::Info => {
                 unimplemented!()
             }
-            ReplAsmCmd::Quit => {
+            ReplCmd::Quit => {
                 std::process::exit(0);
             }
         }
@@ -101,8 +105,9 @@ impl AsmLexer {
         }
     }
 
-    pub fn parse(&mut self, line: &String) -> ParseResult<Option<Executable>> {
+    pub fn parse(&mut self, line: String) -> ParseResult<Option<Executable>> {
         let inst: Vec<&str> = line.trim().split(' ').collect();
+        let len = inst.len() as u8;
         if inst.is_empty() {
             return Ok(None)
         }
@@ -114,61 +119,120 @@ impl AsmLexer {
                 return Ok(None)
             }
         }
+        let mut code: Vec<u8> = Vec::new();
         match inst[0] {
-            "hlt" => {}
+            "hlt"  => {
+                if len > 1 {
+                    return Err(AsmLexErr::IncorrectOperandNo(0, len))
+                }
+                code.push(0x00);
+            }
+            "mov"  => {
+                if len != 3 {
+                    return Err(AsmLexErr::IncorrectOperandNo(2, len))
+                }
+                code.push(0x01);
+                code.push(parse_as_number(&inst[1][1..])? as u8);
+                if inst[2].starts_with("&") { //if is pointer
+                    code.push(1);
+                    code.extend_from_slice(&u32_to_bytes(
+                        parse_as_number(&inst[2][1..])? as u32
+                    ));
+                } else {
+                    code.push(0);
+                    code.extend_from_slice(&i32_to_bytes(
+                        parse_as_number(&inst[2])?
+                    ));
+                }
+            }
+            "jmp"  => {}
+            "jmpf" => {}
+            "jmpb" => {}
+            "cmp"  => {}
+            "lt"   => {}
+            "gt"   => {}
+            "le"   => {}
+            "ge"   => {}
+            "jeq"  => {}
+            "jne"  => {}
+            "aloc" => {}
+            "dalc" => {}
+            "add"  => {}
+            "sub"  => {}
+            "mul"  => {}
+            "div"  => {}
+            "igl"  => {}
             _ => {}
         }
-        unimplemented!()
+        Ok(Some(Executable::Instruction(code)))
     }
 
-    fn parse_command(&mut self, cmd: Vec<&str>) -> Result<ReplAsmCmd, ()> {
+    fn parse_command(&mut self, cmd: Vec<&str>) -> Result<ReplCmd, ()> {
         match cmd[0] {
-            ".info" => { return Ok(ReplAsmCmd::Info) }
-            ".registers" => { return Ok(ReplAsmCmd::Registers) }
-            ".history" => { return Ok(ReplAsmCmd::History) }
-            ".program" => { return Ok(ReplAsmCmd::Program) }
-            ".quit" => { return Ok(ReplAsmCmd::Quit) }
-            ".help" => { return Ok(ReplAsmCmd::Help) }
+            ".info" => { return Ok(ReplCmd::Info) }
+            ".registers" => { return Ok(ReplCmd::Registers) }
+            ".program" => { return Ok(ReplCmd::Program) }
+            ".quit" => { return Ok(ReplCmd::Quit) }
+            ".help" => { return Ok(ReplCmd::Help) }
             _ => {
                 return Err(())
             }
         }
     }
+}
 
-    fn consume_until_next(&mut self) {
-
+fn parse_as_number(text: &str) -> Result<i32, AsmLexErr> {
+    if let Ok(num) = text.parse::<i32>() {
+        return Ok(num)
+    } else {
+        return Err(AsmLexErr::CouldNotParse(text.to_string()))
     }
 }
 
+fn i32_to_bytes(num: i32) -> [u8; 4] {
+    let mut buf = [0, 0, 0, 0];
+    buf.as_mut().write_i32::<LittleEndian>(num).unwrap();
+    buf
+}
+
+fn u32_to_bytes(num: u32) -> [u8; 4] {
+    let mut buf = [0, 0, 0, 0];
+    buf.as_mut().write_u32::<LittleEndian>(num).unwrap();
+    buf
+}
+
 #[derive(Debug, Clone, Copy)]
+#[allow(dead_code)]
 enum Token {
     LineStart,
-    Opcode,
-    Pointer,
-    Literal,
-    Command(ReplAsmCmd),
+    Opcode(u8),
+    Pointer(usize),
+    Register(usize),
+    Literal(i32),
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 enum Executable {
-    Instruction,
-    Command(ReplAsmCmd),
+    Instruction(Vec<u8>),
+    Command(ReplCmd),
 }
 
 #[derive(Debug, Clone, Copy)]
-enum ReplAsmCmd {
+enum ReplCmd {
     Info,
     Registers,
-    History,
     Program,
     Quit,
     Help,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub enum AsmLexErr {
     ReadError,
-    SyntaxError,
+    UnexpectedOperand(String),
+    IncorrectOperandNo(u8, u8),
+    InvalidRegister(u8),
+    CouldNotParse(String),
 }
 
 impl std::error::Error for AsmLexErr {}
@@ -179,8 +243,19 @@ impl fmt::Display for AsmLexErr {
             Self::ReadError => {
                 write!(f, "Error: unable to read line")
             }
-            Self::SyntaxError => {
-                write!(f, "Syntax error")
+            Self::UnexpectedOperand(op) => {
+                write!(f, "Error: Unexpected operand {}", op)
+            }
+            Self::IncorrectOperandNo(expected, given) => {
+                write!(f, "Error: {} operands expected, found {}",
+                    expected, given
+                )
+            }
+            Self::InvalidRegister(num) => {
+                write!(f, "Error: invalid register {}", num)
+            }
+            Self::CouldNotParse(text) => {
+                write!(f, "Error: could not parse `{}` as a number", text)
             }
         }
     }
