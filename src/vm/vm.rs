@@ -37,7 +37,8 @@ impl VM {
                 println!("Halting VM");
                 Ok(true)
             }
-            Opcode::Mov => {
+            Opcode::Mov => { //todo: enable support for pointers
+                //let flag = self.next_8_bits() as usize;
                 let register = self.next_8_bits() as usize;
                 let value = self.next_16_bits() as i32;
                 self.registers[register] = value;
@@ -69,6 +70,34 @@ impl VM {
 
                 Ok(false)
             }
+            Opcode::Lt => {
+                let lhs = self.registers[self.next_8_bits() as usize];
+                let rhs = self.registers[self.next_8_bits() as usize];
+                self.eq = lhs < rhs;
+
+                Ok(false)
+            }
+            Opcode::Gt => {
+                let lhs = self.registers[self.next_8_bits() as usize];
+                let rhs = self.registers[self.next_8_bits() as usize];
+                self.eq = lhs > rhs;
+
+                Ok(false)
+            }
+            Opcode::Le => {
+                let lhs = self.registers[self.next_8_bits() as usize];
+                let rhs = self.registers[self.next_8_bits() as usize];
+                self.eq = lhs <= rhs;
+
+                Ok(false)
+            }
+            Opcode::Ge => {
+                let lhs = self.registers[self.next_8_bits() as usize];
+                let rhs = self.registers[self.next_8_bits() as usize];
+                self.eq = lhs >= rhs;
+
+                Ok(false)
+            }
             Opcode::Jeq => {
                 let target = self.registers[self.next_8_bits() as usize];
                 if self.eq {
@@ -85,6 +114,7 @@ impl VM {
 
                 Ok(false)
             }
+            //Aloc and Dalc go here
             Opcode::Add => {
                 let reg1 = self.registers[self.next_8_bits() as usize];
                 let reg2 = self.registers[self.next_8_bits() as usize];
@@ -169,6 +199,16 @@ impl VM {
     }
 }
 
+enum Eq {
+    Eq,
+    Ne,
+    Lt,
+    Gt,
+    Le,
+    Ge,
+    No,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -215,7 +255,7 @@ mod tests {
         u16_to_little_endian(250, &mut test_code);
 
         // add $0x01 $0x02 $0x03
-        test_code.extend(vec![0x0a, 0x01, 0x02, 0x03]);
+        test_code.extend(vec![0x10, 0x01, 0x02, 0x03]);
 
         // hlt
         test_code.push(0x00);

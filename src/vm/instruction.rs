@@ -6,9 +6,13 @@ pub enum Opcode {
     Jmp,  // Jump to a location in program
     Jpf,  // Jump forward by x bytes
     Jpb,  // Jump backward by x bytes
-    Cmp,  // Compare two registers
-    Jeq,  // Jump if equal
-    Jne,  // Jump if not equal
+    Cmp,  // Compare and set flag if equal
+    Lt,   // Compare and set flag if lhs < rhs
+    Gt,   // Compare and set flag if lhs > rhs
+    Le,   // Compare and set flag if lhs <= rhs
+    Ge,   // Compare and set flag if lhs >= rhs
+    Jeq,  // Jump if flag is set
+    Jne,  // Jump if flag is not set
     Aloc, // Allocate some memory on the heap
     Dalc, // Deallocate the memory on the heap
     Add,  // Add
@@ -27,14 +31,18 @@ impl From<u8> for Opcode {
             0x03 => Opcode::Jpf,
             0x04 => Opcode::Jpb,
             0x05 => Opcode::Cmp,
-            0x06 => Opcode::Jeq,
-            0x07 => Opcode::Jne,
-            0x08 => Opcode::Aloc,
-            0x09 => Opcode::Dalc,
-            0x0a => Opcode::Add,
-            0x0b => Opcode::Sub,
-            0x0c => Opcode::Mul,
-            0x0d => Opcode::Div,
+            0x06 => Opcode::Lt,
+            0x07 => Opcode::Gt,
+            0x08 => Opcode::Le,
+            0x09 => Opcode::Ge,
+            0x0a => Opcode::Jeq,
+            0x0b => Opcode::Jne,
+            0x0c => Opcode::Aloc,
+            0x0d => Opcode::Dalc,
+            0x10 => Opcode::Add,
+            0x11 => Opcode::Sub,
+            0x12 => Opcode::Mul,
+            0x13 => Opcode::Div,
             _ => Opcode::Igl,
         }
     }
