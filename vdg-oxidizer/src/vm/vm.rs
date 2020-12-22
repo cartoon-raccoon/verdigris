@@ -179,9 +179,18 @@ impl VM {
         res
     }
 
-    #[cfg(test)]
     pub fn dump_registers(&self) {
-        println!("{:?}", self.registers);
+        println!("Register dump for Oxidizer VM");
+        for i in 1..=32 {
+            println!("{}: {}", i, self.registers[i-1]);
+        }
+        println!("End of register dump")
+    }
+
+    pub fn dump_program(&self) {
+        println!("Dumping loaded program vector");
+        println!("{:?}", self.program);
+        println!("End of program dump")
     }
 
     #[cfg(test)]

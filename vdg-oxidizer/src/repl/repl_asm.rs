@@ -18,8 +18,8 @@ pub struct Repl {
 
 impl Repl {
     pub fn new() -> Self {
-        let mut lr = Interface::new("vdg-asm").unwrap();
-        lr.set_prompt("vdg-asm >>>").unwrap();
+        let lr = Interface::new("vdg-asm").unwrap();
+        lr.set_prompt(">>> ").unwrap();
         Self {
             vm: VM::new(vec![]),
             interface: lr,
@@ -32,8 +32,18 @@ impl Repl {
         println!("Type .help for a list of commands.");
         loop {
             match self.read_line() {
-                Ok(line) => {
-                    unimplemented!()
+                Ok(exec) => {
+                    if let Some(exec) = exec {
+                        match exec {
+                            Executable::Command(cmd) => {
+                                self.exec_cmd(cmd);
+                                continue
+                            }
+                            Executable::Instruction => {
+                                unimplemented!()
+                            }
+                        }
+                    } else {continue}
                 }
                 Err(e) => {
                     eprintln!("{}", e);
@@ -43,13 +53,40 @@ impl Repl {
         }
     }
 
-    pub fn read_line(&mut self) -> Result<String, AsmLexErr> {
+    fn read_line(&mut self) -> Result<Option<Executable>, AsmLexErr> {
         if let ReadResult::Input(line) = self.interface.read_line()? {
-            self.lexer.parse(&line.to_lowercase());
+            if let Some(exec) = self.lexer.parse(&line.to_lowercase())? {
+                return Ok(Some(exec))
+            }
         }
-        unimplemented!()
+        return Ok(None)
+    }
+
+    fn exec_cmd(&self, cmd: ReplAsmCmd) {
+        match cmd {
+            ReplAsmCmd::Registers => {
+                self.vm.dump_registers();
+            }
+            ReplAsmCmd::History => {
+                unimplemented!()
+            }
+            ReplAsmCmd::Program => {
+                self.vm.dump_program();
+            }
+            ReplAsmCmd::Help => {
+                unimplemented!()
+            }
+            ReplAsmCmd::Info => {
+                unimplemented!()
+            }
+            ReplAsmCmd::Quit => {
+                std::process::exit(0);
+            }
+        }
     }
 }
+
+pub type ParseResult<T> = Result<T, AsmLexErr>;
 
 struct AsmLexer {
     pos: usize,
@@ -64,16 +101,18 @@ impl AsmLexer {
         }
     }
 
-    pub fn parse(&mut self, line: &String) -> Option<Opcode> {
-        let inst: Vec<&str> = line.split(' ').collect();
+    pub fn parse(&mut self, line: &String) -> ParseResult<Option<Executable>> {
+        let inst: Vec<&str> = line.trim().split(' ').collect();
         if inst.is_empty() {
-            return None
+            return Ok(None)
         }
         if inst[0].starts_with('.') {
-            if let Err(_) = self.command(inst) {
-                eprintln!("Invalid command, issue .help for a list of commands")
+            if let Ok(cmd) = self.parse_command(inst) {
+                return Ok(Some(Executable::Command(cmd)));
+            } else {
+                eprintln!("Invalid command, type .help for a list of commands");
+                return Ok(None)
             }
-            return None
         }
         match inst[0] {
             "hlt" => {}
@@ -82,19 +121,18 @@ impl AsmLexer {
         unimplemented!()
     }
 
-    fn command(&mut self, cmd: Vec<&str>) -> Result<ReplAsmCmd, ()> {
+    fn parse_command(&mut self, cmd: Vec<&str>) -> Result<ReplAsmCmd, ()> {
         match cmd[0] {
-            ".info" => {}
-            ".registers" => {}
-            ".history" => {}
-            ".program" => {}
-            ".quit" => {}
-            ".help" => {}
+            ".info" => { return Ok(ReplAsmCmd::Info) }
+            ".registers" => { return Ok(ReplAsmCmd::Registers) }
+            ".history" => { return Ok(ReplAsmCmd::History) }
+            ".program" => { return Ok(ReplAsmCmd::Program) }
+            ".quit" => { return Ok(ReplAsmCmd::Quit) }
+            ".help" => { return Ok(ReplAsmCmd::Help) }
             _ => {
                 return Err(())
             }
         }
-        unimplemented!()
     }
 
     fn consume_until_next(&mut self) {
@@ -108,14 +146,23 @@ enum Token {
     Opcode,
     Pointer,
     Literal,
+    Command(ReplAsmCmd),
 }
 
+#[derive(Debug, Clone, Copy)]
+enum Executable {
+    Instruction,
+    Command(ReplAsmCmd),
+}
+
+#[derive(Debug, Clone, Copy)]
 enum ReplAsmCmd {
     Info,
     Registers,
     History,
     Program,
     Quit,
+    Help,
 }
 
 #[derive(Debug, Clone, Copy)]
