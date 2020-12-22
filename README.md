@@ -17,6 +17,8 @@ Verdigris right now is planned to be dynamically typed, but this may change in t
 
 Features such as lifetimes and ownership/borrowing are not needed here, as the language is garbage collected and memory management is handled by the runtime.
 
+Verdigris is powered by the Oxidizer runtime, a register-based VM built from scratch for the language.
+
 Note: This language is simply a passion project, and is not intended for production usage. It doesn't have that much of a USP anyway.
 To this end, a standard library is _not_ planned, and may or may not be implemented in the future.
 However, core data structures and their methods will be implemented.
