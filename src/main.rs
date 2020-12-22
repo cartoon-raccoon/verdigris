@@ -1,10 +1,10 @@
 mod lexer;
-mod vm;
-mod repl;
 
 use lexer::Lexer;
+use vdg_oxidizer::Repl;
 
 fn main() {
     let scanner = Lexer::new();
-    println!("Welcome to Verdigris!");
+    let mut repl = Repl::new();
+    repl.run();
 }
