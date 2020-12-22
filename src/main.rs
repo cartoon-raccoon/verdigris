@@ -1,5 +1,6 @@
 mod lexer;
 mod vm;
+mod repl;
 
 use lexer::Lexer;
 
