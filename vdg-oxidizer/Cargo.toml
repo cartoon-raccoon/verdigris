@@ -1,0 +1,10 @@
+[package]
+name = "vdg-oxidizer"
+version = "0.1.0"
+authors = ["cartoon-raccoon <shaughn.chan@gmail.com>"]
+edition = "2018"
+description = "Provides the VM and REPL for the Oxidizer runtime"
+license = "MIT"
+
+[dependencies]
+linefeed = "0.6.0"
