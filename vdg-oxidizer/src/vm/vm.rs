@@ -25,19 +25,19 @@ impl VM {
         }
     }
 
-    pub fn run(&mut self) -> Result<(), ()> {
+    pub fn run(&mut self) -> Result<(), VMError> {
         while !self.execute()? {}
         Ok(())
     }
 
-    pub fn run_once(&mut self) -> Result<bool, ()> {
+    pub fn run_once(&mut self) -> Result<bool, VMError> {
         self.execute()
     }
 
     #[inline]
-    fn execute(&mut self) -> Result<bool, ()> {
+    fn execute(&mut self) -> Result<bool, VMError> {
         if self.pc >= self.program.len() {
-            return Err(())
+            return Err(VMError::SegFault)
         }
         match self.decode_opcode() {
             Opcode::Hlt => {
@@ -49,8 +49,13 @@ impl VM {
                 let flag = self.next_8_bits() as usize;
                 let value = if flag == 0 {
                     self.read_int()
-                } else {
+                } else if flag == 1 {
                     unimplemented!()
+                } else if flag == 2 {
+                    self.registers[self.next_8_bits() as usize]
+                } else {
+                    eprintln!("Error decoding opcode");
+                    return Err(VMError::OpcodeErr)
                 };
                 self.registers[register] = value;
 
@@ -157,11 +162,11 @@ impl VM {
             }
             Opcode::Igl => {
                 eprintln!("Illegal opcode");
-                return Err(())
+                return Err(VMError::IglOpcode)
             }
             oc @ _ => {
                 eprintln!("{:?} opcode not yet supported", oc);
-                return Err(())
+                return Err(VMError::Unsupported)
             }
         }
     }
@@ -231,9 +236,12 @@ impl VM {
     }
 }
 
+#[derive(Debug)]
 pub enum VMError {
     IglOpcode,
     SegFault,
+    OpcodeErr,
+    Unsupported,
 }
 
 #[cfg(test)]
