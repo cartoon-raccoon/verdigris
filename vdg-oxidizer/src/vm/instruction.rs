@@ -1,4 +1,4 @@
-use crate::repl::lexer::Token;
+use crate::assembler::Operand;
 
 #[non_exhaustive]
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -50,14 +50,12 @@ impl From<u8> for Opcode {
     }
 }
 
-pub type InvalidOperandsErr = (u32, u32);
-
-// Not sure what to do with this yet???
+#[derive(Debug, Clone, PartialEq)]
 pub struct Instruction {
-    inst: Opcode,
-    op1: Option<Token>,
-    op2: Option<Token>,
-    op3: Option<Token>,
+    pub inst: Opcode,
+    pub op1: Option<Operand>,
+    pub op2: Option<Operand>,
+    pub op3: Option<Operand>,
 }
 
 
@@ -71,8 +69,19 @@ impl Instruction {
         }
     }
 
-    pub fn from_tokens(tokens: Vec<Token>) -> Result<Self, InvalidOperandsErr> {
-        unimplemented!()
+    pub fn from_parsed(
+        opcode: Opcode, 
+        tokens: (
+            Option<Operand>, 
+            Option<Operand>, 
+            Option<Operand>)
+        ) -> Self {
+        Self {
+            inst: opcode,
+            op1: tokens.0,
+            op2: tokens.1,
+            op3: tokens.2,
+        }
     }
 
     pub fn to_bytes(self) -> Vec<u8> {
