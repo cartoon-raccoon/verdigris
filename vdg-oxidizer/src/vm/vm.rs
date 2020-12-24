@@ -50,7 +50,7 @@ impl VM {
                 let value = if flag == 0 {
                     self.read_int()
                 } else if flag == 1 {
-                    unimplemented!()
+                    unimplemented!("pointer size not yet worked out")
                 } else if flag == 2 {
                     self.registers[self.next_8_bits() as usize]
                 } else {
@@ -62,103 +62,64 @@ impl VM {
                 Ok(false)
             }
             Opcode::Jmp => {
-                let target = self.registers[self.next_8_bits() as usize];
-                self.pc = target as usize;
-
-                Ok(false)
+                unimplemented!()
             }
             Opcode::Jmpf => {
-                let target = self.registers[self.next_8_bits() as usize];
-                self.pc += target as usize;
-
-                Ok(false)
+                unimplemented!()
             }
             Opcode::Jmpb => {
-                let target = self.registers[self.next_8_bits() as usize];
-                self.pc -= target as usize;
-
-                Ok(false)
+                unimplemented!()
             }
             Opcode::Cmp => {
-                let lhs = self.registers[self.next_8_bits() as usize];
-                let rhs = self.registers[self.next_8_bits() as usize];
-                self.eq = lhs == rhs;
-
-                Ok(false)
+                unimplemented!()
             }
             Opcode::Lt => {
-                let lhs = self.registers[self.next_8_bits() as usize];
-                let rhs = self.registers[self.next_8_bits() as usize];
-                self.eq = lhs < rhs;
-
-                Ok(false)
+                unimplemented!()
             }
             Opcode::Gt => {
-                let lhs = self.registers[self.next_8_bits() as usize];
-                let rhs = self.registers[self.next_8_bits() as usize];
-                self.eq = lhs > rhs;
-
-                Ok(false)
+                unimplemented!()
             }
             Opcode::Le => {
-                let lhs = self.registers[self.next_8_bits() as usize];
-                let rhs = self.registers[self.next_8_bits() as usize];
-                self.eq = lhs <= rhs;
-
-                Ok(false)
+                unimplemented!()
             }
             Opcode::Ge => {
-                let lhs = self.registers[self.next_8_bits() as usize];
-                let rhs = self.registers[self.next_8_bits() as usize];
-                self.eq = lhs >= rhs;
-
-                Ok(false)
+                unimplemented!()
             }
             Opcode::Jeq => {
-                let target = self.registers[self.next_8_bits() as usize];
-                if self.eq {
-                    self.pc = target as usize;
-                }
-
-                Ok(false)
+                unimplemented!()
             }
             Opcode::Jne => {
-                let target = self.registers[self.next_8_bits() as usize];
-                if !self.eq {
-                    self.pc = target as usize;
-                }
-
+                unimplemented!()
+            }
+            Opcode::Aloc => {
+                let flag = self.next_8_bits();
+                let value = if flag == 0 {
+                    self.read_int()
+                } else if flag == 1 {
+                    unimplemented!("pointer size not yet worked out")
+                } else if flag == 2 {
+                    self.registers[self.next_8_bits() as usize]
+                } else {
+                    return Err(VMError::OpcodeErr)
+                };
+                let target = self.heap.len() + value as usize;
+                self.heap.resize(target, 0);
                 Ok(false)
             }
-            //Aloc and Dalc go here
+            Opcode::Dalc => {
+                unimplemented!()
+            }
             Opcode::Add => {
-                let reg1 = self.registers[self.next_8_bits() as usize];
-                let reg2 = self.registers[self.next_8_bits() as usize];
-                self.registers[self.next_8_bits() as usize] = reg1 + reg2;
-
-                Ok(false)
+                unimplemented!()
             }
             Opcode::Sub => {
-                let reg1 = self.registers[self.next_8_bits() as usize];
-                let reg2 = self.registers[self.next_8_bits() as usize];
-                self.registers[self.next_8_bits() as usize] = reg1 - reg2;
-
-                Ok(false)
+                unimplemented!()
             }
             Opcode::Mul => {
-                let reg1 = self.registers[self.next_8_bits() as usize];
-                let reg2 = self.registers[self.next_8_bits() as usize];
-                self.registers[self.next_8_bits() as usize] = reg1 * reg2;
-
-                Ok(false)
+                unimplemented!()
             }
             Opcode::Div => {
-                let reg1 = self.registers[self.next_8_bits() as usize];
-                let reg2 = self.registers[self.next_8_bits() as usize];
-                self.registers[self.next_8_bits() as usize] = reg1 / reg2;
-                self.remainder = reg1 % reg2;
-
-                Ok(false)
+                unimplemented!()
             }
             Opcode::Igl => {
                 eprintln!("Illegal opcode");
@@ -226,6 +187,10 @@ impl VM {
         println!("End of program dump")
     }
 
+    pub fn heap(&self) -> usize {
+        self.heap.len()
+    }
+
     #[cfg(test)]
     pub fn test_register(&self, reg: usize) -> Result<i32, ()> {
         if reg > 31 {
@@ -262,14 +227,14 @@ mod tests {
     }
 
     #[test]
-    fn test_load_opcode() {
-        let mut test_code: Vec<u8> = vec![0x01, 0x02];
+    fn test_mov_opcode() {
+        let mut test_code: Vec<u8> = vec![0x01, 0x02, 0x00];
 
-        u16_to_little_endian(500, &mut test_code);
+        test_code.extend(i32_to_bytes(500).to_vec());
         test_code.push(0x00);
         /*
         The above code means:
-        mov %2 500 (0x01 (mov), 0x02 (register 2), 1, 244, (500 in little endian))
+        mov $2 500 (0x01 (mov), 0x02 (register 2), flag LIT (0), (500 in little endian))
         hlt (0x00)
         */
         let mut test_vm = VM::new(test_code);
@@ -280,33 +245,25 @@ mod tests {
     }
 
     #[test]
-    fn test_add_opcode() {
-        // 0x01, 0x01, 250 -> mov $0x01 250
-        let mut test_code: Vec<u8> = vec![0x01, 0x01];
-        u16_to_little_endian(250, &mut test_code);
-
-        // 0x01, 0x02, 250 -> mov $0x02 250
-        test_code.extend(vec![0x01, 0x02]);
-        u16_to_little_endian(250, &mut test_code);
-
-        // add $0x01 $0x02 $0x03
-        test_code.extend(vec![0x10, 0x01, 0x02, 0x03]);
-
+    fn test_aloc_opcode() {
+        // mov $2 10
+        let mut test_code: Vec<u8> = vec![0x01, 0x02, 0x00];
+        test_code.extend(i32_to_bytes(10).to_vec());
+        // aloc $2
+        test_code.extend(vec![0x0c, 0x02, 0x02]);
         // hlt
         test_code.push(0x00);
 
         let mut test_vm = VM::new(test_code);
+
         test_vm.run().unwrap();
-        
-        assert_eq!(test_vm.test_register(3).unwrap(), 500);
+        assert_eq!(test_vm.heap(), 10)
     }
 
-    // helper function to convert a u16 to a little-endian byte repr
-    // and then push the bytes to the program
-    fn u16_to_little_endian(input: u16, prog: &mut Vec<u8>) {
-        let upper: u8 = (input >> 8) as u8;
-        let lower: u8 = (input & 0xff) as u8;
-        prog.push(upper);
-        prog.push(lower);
+    fn i32_to_bytes(num: i32) -> [u8; 4] {
+        let mut buf: [u8; 4] = [0, 0, 0, 0];
+        buf.as_mut().write_i32::<LittleEndian>(num).unwrap();
+
+        buf
     }
 }
