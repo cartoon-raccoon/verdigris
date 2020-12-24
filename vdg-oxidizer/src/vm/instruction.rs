@@ -1,3 +1,5 @@
+use crate::repl::lexer::Token;
+
 #[non_exhaustive]
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Opcode {
@@ -50,11 +52,12 @@ impl From<u8> for Opcode {
 
 pub type InvalidOperandsErr = (u32, u32);
 
-#[allow(dead_code)]
 // Not sure what to do with this yet???
 pub struct Instruction {
     inst: Opcode,
-    operands: Vec<u8>,
+    op1: Option<Token>,
+    op2: Option<Token>,
+    op3: Option<Token>,
 }
 
 
@@ -62,14 +65,17 @@ impl Instruction {
     pub fn new(byte: u8) -> Self {
         Instruction {
             inst: Opcode::from(byte),
-            operands: Vec::new(),
+            op1: None,
+            op2: None,
+            op3: None,
         }
     }
 
-    pub fn from_opcode(opcode: Opcode, ) -> Result<Self, InvalidOperandsErr> {
-        match opcode {
-            _ => {}
-        }
+    pub fn from_tokens(tokens: Vec<Token>) -> Result<Self, InvalidOperandsErr> {
+        unimplemented!()
+    }
+
+    pub fn to_bytes(self) -> Vec<u8> {
         unimplemented!()
     }
 }
