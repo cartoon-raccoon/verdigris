@@ -6,9 +6,10 @@
 
 use std::iter::Peekable;
 use std::str::Chars;
+use std::fmt;
 
 use crate::vm::Opcode;
-use crate::assembler::AsmParseErr;
+use crate::assembler::{AsmParseErr, Directive};
 
 /// The representation of a finite state machine for lexical analysis
 /// of Verdigris bytecode asssembly.
@@ -92,7 +93,10 @@ impl<'a> Lexer<'a> {
                     continue
                 }
                 '"' => {
-                    tokens.push(self.consume_str_lit()?)
+                    tokens.push(self.consume_str_lit()?);
+                }
+                '.' => {
+                    tokens.push(self.consume_directive()?);
                 }
                 ' ' => {
                     if !buffer.is_empty() {
@@ -222,6 +226,23 @@ impl<'a> Lexer<'a> {
         }
     }
 
+    fn consume_directive(&mut self) -> Result<Token, AsmParseErr> {
+        let mut buf = String::new();
+        loop {
+            let c = self.code.next();
+            self.context.column += 1;
+            if c == None || c.unwrap().is_whitespace() {
+                return Ok(Token::Directive(Directive::try_from(buf, self.context)?, self.context))
+            } else if let Some(c) = c {
+                if c == '\n' {
+                    self.context.line += 1;
+                    self.context.column = 1;
+                }
+                buf.push(c);
+            }
+        }
+    }
+
     fn consume_last_token(&mut self, mut last: String) -> Result<Token, AsmParseErr> {
         if last.starts_with("$") {
             return Ok(Token::Register(self.parse_as_register(&last[1..])?, self.context))
@@ -274,11 +295,12 @@ pub enum Token {
     Opcode(Opcode, Context),
     Pointer(String, Context),
     Register(u8, Context),
+    LabelUse(String, Context),
     NumLiteral(i32, Context),
     StrLiteral(String, Context),
-    LabelUse(String, Context),
     LabelDeclStart(String, Context),
     LabelDeclEnd(Context),
+    Directive(Directive, Context),
 }
 
 impl Token {
@@ -288,11 +310,59 @@ impl Token {
             Opcode(_, con) => return *con,
             Pointer(_, con) => return *con,
             Register(_, con) => return *con,
+            LabelUse(_, con) => return *con,
             NumLiteral(_, con) => return *con,
             StrLiteral(_, con) => return *con,
-            LabelUse(_, con) => return *con,
             LabelDeclStart(_, con) => return *con,
             LabelDeclEnd(con) => return *con,
+            Directive(_, con) => return *con,
+        }
+    }
+
+    pub fn is_operand(&self) -> bool {
+        use Token::*;
+        match self {
+            Opcode(_,_) |
+            StrLiteral(_,_) |
+            LabelDeclStart(_,_) |
+            LabelDeclEnd(_) |
+            Directive(_,_) => false,
+            _ => true
+        }
+    }
+}
+
+impl fmt::Display for Token {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        use Token::*;
+        match self {
+            Opcode(op, _) => {
+                write!(f, "{:?}", op)
+            }
+            Pointer(ptr, _) => {
+                write!(f, "[{}]", ptr)
+            }
+            Register(reg, _) => {
+                write!(f, "${}", reg)
+            }
+            NumLiteral(num, _) => {
+                write!(f, "{}", num)
+            }
+            StrLiteral(text, _) => {
+                write!(f, "\"{}\"", text)
+            }
+            LabelUse(name, _) => {
+                write!(f, "@{}", name)
+            }
+            LabelDeclStart(name, _) => {
+                write!(f, "{}:", name)
+            }
+            LabelDeclEnd(_) => {
+                write!(f, "}}")
+            }
+            Directive(dir, _) => {
+                write!(f, ".{:?}", dir)
+            }
         }
     }
 }
@@ -345,6 +415,17 @@ mod tests {
             Token::LabelDeclStart(String::from("string"), tokens[0].context()),
             Token::StrLiteral(String::from("hello"), tokens[1].context()),
             Token::LabelDeclEnd(tokens[2].context())
+        ])
+    }
+
+    #[test]
+    fn test_directive() {
+        let test_str = ".string \"hello i am cool\"";
+        let mut lexer = Lexer::new();
+        let tokens = lexer.tokenize(test_str).unwrap();
+        assert_eq!(tokens, vec![
+            Token::Directive(Directive::String, tokens[0].context()),
+            Token::StrLiteral(String::from("hello i am cool"), tokens[1].context())
         ])
     }
 
