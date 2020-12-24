@@ -1,9 +1,10 @@
 REG: Register, denoted with $
 PLT: Pointer to memory, denoted with &
 LIT: Literal value, no sigil
+LAB: Label, is text
 
 hlt  none
-mov  [REG] [LIT|PTR]
+mov  [REG] [LIT|PTR|REG]
 jmp  [LIT|PTR|LAB]
 jmpf [LIT]
 jmpb [LIT]
@@ -25,8 +26,10 @@ igl  none
 How registers, pointers and literals are denoted in memory
 1. VM reads opcode
 2. VM gets next byte from program
+    If there is only one possible operand, the VM skips this step
 3. byte value:
-    0 -> literal
-    1 -> pointer
-    2 -> register
+    0 -> literal (i32)
+    1 -> pointer (u32)
+    2 -> register (u8)
     _ -> (throws error)
+4. VM parses next few bytes as necessary
