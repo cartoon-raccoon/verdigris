@@ -2,6 +2,8 @@ use byteorder::*;
 use std::io;
 use std::fmt;
 
+use crate::vm::instruction::Opcode;
+
 pub type ParseResult<T> = Result<T, AsmLexErr>;
 
 pub struct AsmLexer {
@@ -37,13 +39,13 @@ impl AsmLexer {
                 if len > 1 {
                     return Err(AsmLexErr::IncorrectOperandNo(0, len - 1))
                 }
-                code.push(0x00);
+                code.push(Opcode::Hlt as u8);
             }
             "mov"  => {
                 if len != 3 {
                     return Err(AsmLexErr::IncorrectOperandNo(2, len - 1))
                 }
-                code.push(0x01);
+                code.push(Opcode::Mov as u8);
                 code.push(parse_as_register(&inst[1][1..])? as u8);
                 if inst[2].starts_with("&") { //if is pointer
                     code.push(1);
@@ -64,7 +66,7 @@ impl AsmLexer {
                 if len != 2 {
                     return Err(AsmLexErr::IncorrectOperandNo(1, len - 1))
                 }
-                code.push(0x02);
+                code.push(Opcode::Jmp as u8);
                 if inst[1].starts_with("&") { //is pointer
                     code.push(1);
                     code.extend_from_slice(&u32_to_bytes(
@@ -82,7 +84,12 @@ impl AsmLexer {
                 if len != 2 {
                     return Err(AsmLexErr::IncorrectOperandNo(1, len - 1))
                 }
-                code.push(if op == "jmpf" {0x02} else {0x03});
+                code.push(if op == "jmpf" {
+                        Opcode::Jmpf as u8
+                    } else {
+                        Opcode::Jmpb as u8
+                    }
+                );
                 if let Ok(num) = parse_as_number(inst[1]) {
                     code.extend_from_slice(&i32_to_bytes(num));
                 } else {
