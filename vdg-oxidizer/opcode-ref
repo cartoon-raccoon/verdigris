@@ -1,5 +1,5 @@
 REG: Register, denoted with $
-PLT: Pointer to memory, denoted with &
+PLT: Pointer to memory, enclosed with [ ]
 LIT: Literal value, no sigil
 LAB: Label, is text
 
@@ -15,9 +15,9 @@ le   ""
 ge   ""
 jeq  [LIT|PTR|LAB]
 jne  ""
-aloc [LIT]
-dalc [LIT]
-add  [REG|LIT] [REG|LIT]
+aloc [LIT|PTR|REG]
+dalc [LIT|PTR|REG]
+add  [REG|LIT|PTR] [REG|LIT|PTR] [REG]
 sub  ""
 mul  ""
 div  ""
@@ -29,7 +29,12 @@ How registers, pointers and literals are denoted in memory
     If there is only one possible operand, the VM skips this step
 3. byte value:
     0 -> literal (i32)
-    1 -> pointer (u32)
+    1 -> pointer (usize) (labels get replaced with pointers at assembly)
     2 -> register (u8)
     _ -> (throws error)
 4. VM parses next few bytes as necessary
+
+Directives: Instructions to the assembler
+Begin with '.'
+
+.str -> Reserves a string
