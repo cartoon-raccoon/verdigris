@@ -1,3 +1,9 @@
+//! The lexical analyser for Verdigris assembly code.
+//! 
+//! The Lexer struct only converts the raw assembly text into a token stream.
+//! This token stream is then passed down to the Parser struct, which then
+//! parses the tokens into discrete instructions.
+
 use std::fmt;
 use std::iter::Peekable;
 use std::str::Chars;
@@ -8,6 +14,7 @@ use crate::instruction::Opcode;
 pub struct Lexer<'a> {
     code: Peekable<Chars<'a>>,
     state: Option<Token>,
+    context: Context,
 }
 
 impl<'a> Lexer<'a> {
@@ -15,10 +22,12 @@ impl<'a> Lexer<'a> {
         Lexer {
             code: "".chars().peekable(),
             state: None,
+            context: Context::from(1, 1)
         }
     }
 
     //todo: add support for individual chars with single quotes
+    //todo: add support for escaped characters (\n, \t, etc)
     pub fn tokenize(&mut self, code: &'a str) -> Result<Vec<Token>, AsmLexErr> {
         self.code = code.chars().peekable();
         let mut tokens = Vec::new();
@@ -26,16 +35,20 @@ impl<'a> Lexer<'a> {
         while let Some(c) = self.code.next() {
             if c.is_whitespace() && c != ' ' {
                 if !buffer.is_empty() {
-                    if let Ok(num) = parse_as_number(&buffer) {
-                        tokens.push(Token::NumLiteral(num))
+                    if let Ok(num) = self.parse_as_number(&buffer) {
+                        tokens.push(Token::NumLiteral(num, self.context))
                     } else {
                         tokens.push(
                             Token::Opcode(self.consume_opcode(&buffer).ok_or(
-                                AsmLexErr::UnexpectedToken(buffer.clone())
-                            )?)
+                                AsmLexErr::UnexpectedToken(buffer.clone(), self.context)
+                            )?, self.context)
                         );
                     }
                     buffer.clear();
+                }
+                if c == '\n' {
+                    self.context.line += 1;
+                    self.context.column = 1;
                 }
                 continue
             }
@@ -53,21 +66,21 @@ impl<'a> Lexer<'a> {
                     continue
                 }
                 ':' => {
-                    let token = Token::LabelDeclStart(buffer.clone());
+                    let token = Token::LabelDeclStart(buffer.clone(), self.context);
                     self.state = Some(token.clone());
                     tokens.push(token);
                     buffer.clear();
                     continue
                 }
                 '{' => {
-                    if let Some(&Token::LabelDeclStart(_)) = tokens.last()  {
+                    if let Some(&Token::LabelDeclStart(_, _)) = tokens.last()  {
                         continue
                     } else {
-                        return Err(AsmLexErr::UnexpectedToken(c.to_string()))
+                        return Err(AsmLexErr::UnexpectedToken(c.to_string(), self.context))
                     }
                 }
                 '}' => {
-                    tokens.push(Token::LabelDeclEnd);
+                    tokens.push(Token::LabelDeclEnd(self.context));
                     continue
                 }
                 '@' => {
@@ -79,13 +92,13 @@ impl<'a> Lexer<'a> {
                 }
                 ' ' => {
                     if !buffer.is_empty() {
-                        if let Ok(num) = parse_as_number(&buffer) {
-                            tokens.push(Token::NumLiteral(num))
+                        if let Ok(num) = self.parse_as_number(&buffer) {
+                            tokens.push(Token::NumLiteral(num, self.context))
                         } else {
                             tokens.push(
                                 Token::Opcode(self.consume_opcode(&buffer).ok_or(
-                                    AsmLexErr::UnexpectedToken(buffer.clone())
-                                )?)
+                                    AsmLexErr::UnexpectedToken(buffer.clone(), self.context)
+                                )?, self.context)
                             );
                         }
                         buffer.clear();
@@ -95,6 +108,7 @@ impl<'a> Lexer<'a> {
                     buffer.push(c);
                 }
             }
+            self.context.column += 1;
         }
         if !buffer.is_empty() {
             tokens.push(self.consume_last_token(buffer)?);
@@ -135,9 +149,14 @@ impl<'a> Lexer<'a> {
         let mut buf = String::new();
         loop {
             let c = self.code.next();
+            self.context.column += 1;
             if c == None || c.unwrap().is_whitespace() {
-                return Ok(Token::Register(parse_as_register(&buf)?))
+                return Ok(Token::Register(self.parse_as_register(&buf)?, self.context))
             } else if let Some(c) = c {
+                if c == '\n' {
+                    self.context.line += 1;
+                    self.context.column = 1;
+                }
                 buf.push(c);
             }
         }
@@ -147,9 +166,14 @@ impl<'a> Lexer<'a> {
         let mut buf = String::new();
         loop {
             let c = self.code.next();
+            self.context.column += 1;
             if c == Some(']') || c == None {
-                return Ok(Token::Pointer(buf))
+                return Ok(Token::Pointer(buf, self.context))
             } else if let Some(c) = c {
+                if c == '\n' {
+                    self.context.line += 1;
+                    self.context.column = 1;
+                }
                 buf.push(c);
             }
         }
@@ -159,9 +183,14 @@ impl<'a> Lexer<'a> {
         let mut buf = String::new();
         loop {
             let c = self.code.next();
+            self.context.column += 1;
             if c == None || c.unwrap().is_whitespace() {
-                return Ok(Token::LabelUse(buf))
+                return Ok(Token::LabelUse(buf, self.context))
             } else if let Some(c) = c {
+                if c == '\n' {
+                    self.context.line += 1;
+                    self.context.column = 1;
+                }
                 buf.push(c);
             }
         }
@@ -171,96 +200,111 @@ impl<'a> Lexer<'a> {
         let mut buf = String::new();
         loop {
             let c = self.code.next();
+            self.context.column += 1;
             if c == Some('"') {
-                return Ok(Token::StrLiteral(buf))
+                return Ok(Token::StrLiteral(buf, self.context))
             } else if c == Some('\\') {
                 if let Some(c) = self.code.next() {
                     buf.push(c);
                 } else {
-                    return Err(AsmLexErr::UnexpectedEOF)
+                    return Err(AsmLexErr::UnexpectedEOF(self.context))
                 }
                 continue
             } else if let Some(c) = c {
+                if c == '\n' {
+                    self.context.line += 1;
+                    self.context.column = 1;
+                }
                 buf.push(c);
             } else if c == None {
-                return Err(AsmLexErr::UnexpectedEOF)
+                return Err(AsmLexErr::UnexpectedEOF(self.context))
             }
         }
     }
 
     fn consume_last_token(&mut self, mut last: String) -> Result<Token, AsmLexErr> {
         if last.starts_with("$") {
-            return Ok(Token::Register(parse_as_register(&last[1..])?))
+            return Ok(Token::Register(self.parse_as_register(&last[1..])?, self.context))
         } else if last.starts_with("[") {
             if last.ends_with("]") {
                 last.pop();
-                return Ok(Token::Pointer(last[1..].to_string()))
+                return Ok(Token::Pointer(last[1..].to_string(), self.context))
             } else {
-                return Err(AsmLexErr::UnexpectedEOF)
+                return Err(AsmLexErr::UnexpectedEOF(self.context))
             }
         } else if last.ends_with(":") { // is label: if last, something is wrong
-            return Err(AsmLexErr::UnexpectedToken(last))
+            return Err(AsmLexErr::UnexpectedToken(last, self.context))
         } else if last.starts_with("@") {
-            return Ok(Token::LabelUse(last[1..].to_string()))
+            return Ok(Token::LabelUse(last[1..].to_string(), self.context))
         } else {
-            if let Ok(num) = parse_as_number(&last) {
-                return Ok(Token::NumLiteral(num))
+            if let Ok(num) = self.parse_as_number(&last) {
+                return Ok(Token::NumLiteral(num, self.context))
             } else {
                 return Ok(
                     Token::Opcode(self.consume_opcode(&last).ok_or(
-                        AsmLexErr::UnexpectedToken(last)
-                    )?)
+                        AsmLexErr::UnexpectedToken(last, self.context)
+                    )?, self.context)
                 );
             }
         }
     }
-}
 
-fn parse_as_number(text: &str) -> Result<i32, AsmLexErr> {
-    if let Ok(num) = text.parse::<i32>() {
-        return Ok(num)
-    } else {
-        return Err(AsmLexErr::CouldNotParse(text.to_string()))
-    }
-}
-
-fn parse_as_register(text: &str) -> Result<u8, AsmLexErr> {
-    if let Ok(num) = text.parse::<u32>() {
-        if num > 31 {
-            return Err(AsmLexErr::InvalidRegister(num))
+    fn parse_as_number(&self, text: &str) -> Result<i32, AsmLexErr> {
+        if let Ok(num) = text.parse::<i32>() {
+            return Ok(num)
+        } else {
+            return Err(AsmLexErr::CouldNotParse(text.to_string(), self.context))
         }
-        return Ok(num as u8)
-    } else {
-        return Err(AsmLexErr::CouldNotParse(text.to_string()))
+    }
+    
+    fn parse_as_register(&self, text: &str) -> Result<u8, AsmLexErr> {
+        if let Ok(num) = text.parse::<u32>() {
+            if num > 31 {
+                return Err(AsmLexErr::InvalidRegister(num, self.context))
+            }
+            return Ok(num as u8)
+        } else {
+            return Err(AsmLexErr::CouldNotParse(text.to_string(), self.context))
+        }
     }
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Token {
-    Opcode(Opcode),
-    Pointer(String),
-    Register(u8),
-    NumLiteral(i32),
-    StrLiteral(String),
-    LabelDeclStart(String),
-    LabelDeclEnd,
-    LabelUse(String),
+    Opcode(Opcode, Context),
+    Pointer(String, Context),
+    Register(u8, Context),
+    NumLiteral(i32, Context),
+    StrLiteral(String, Context),
+    LabelDeclStart(String, Context),
+    LabelDeclEnd(Context),
+    LabelUse(String, Context),
 }
 
-#[derive(Debug, Clone, PartialEq)]
-pub struct Label {
-    name: String,
-    code: Vec<Token>,
+impl Token {
+    pub fn context(&self) -> Context {
+        use Token::*;
+        match self {
+            Opcode(_, con) => return *con,
+            Pointer(_, con) => return *con,
+            Register(_, con) => return *con,
+            NumLiteral(_, con) => return *con,
+            StrLiteral(_, con) => return *con,
+            LabelDeclStart(_, con) => return *con,
+            LabelDeclEnd(con) => return *con,
+            LabelUse(_, con) => return *con,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum AsmLexErr {
-    UnexpectedOperand(String),
-    UnexpectedToken(String),
-    UnexpectedEOF,
-    IncorrectOperandNo(u8, u8),
-    InvalidRegister(u32),
-    CouldNotParse(String),
+    UnexpectedOperand(String, Context),
+    UnexpectedToken(String, Context),
+    UnexpectedEOF(Context),
+    IncorrectOperandNo(u8, u8, Context),
+    InvalidRegister(u32, Context),
+    CouldNotParse(String, Context),
 }
 
 impl std::error::Error for AsmLexErr {}
@@ -268,26 +312,56 @@ impl std::error::Error for AsmLexErr {}
 impl fmt::Display for AsmLexErr {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Self::UnexpectedOperand(op) => {
-                write!(f, "Error: Unexpected operand {}", op)
-            }
-            Self::UnexpectedToken(token) => {
-                write!(f, "Error: Unexpected token {}", token)
-            }
-            Self::UnexpectedEOF => {
-                write!(f, "Error: Reached end of file while parsing")
-            }
-            Self::IncorrectOperandNo(expected, given) => {
-                write!(f, "Error: {} operands expected, found {}",
-                    expected, given
+            Self::UnexpectedOperand(op, con) => {
+                write!(f, 
+                    "Error: Unexpected operand {}\nLine {}, Column {}", 
+                    op, con.line, con.column
                 )
             }
-            Self::InvalidRegister(num) => {
-                write!(f, "Error: invalid register {}", num)
+            Self::UnexpectedToken(token, con) => {
+                write!(f, 
+                    "Error: Unexpected token {}\n Line {}, Column {}", 
+                    token, con.line, con.column
+                )
             }
-            Self::CouldNotParse(text) => {
-                write!(f, "Error: could not parse `{}` as a number", text)
+            Self::UnexpectedEOF(con) => {
+                write!(f, 
+                    "Error: Reached end of file while parsing\nLine {}, Column {}",
+                    con.line, con.column
+                )
             }
+            Self::IncorrectOperandNo(expected, given, con) => {
+                write!(f, "Error: {} operands expected, found {}\nLine {}, Column {}",
+                    expected, given, con.line, con.column
+                )
+            }
+            Self::InvalidRegister(num, con) => {
+                write!(f, 
+                    "Error: invalid register {}\nLine {}, Column {}", 
+                    num, con.line, con.column
+                )
+            }
+            Self::CouldNotParse(text, con) => {
+                write!(f, 
+                    "Error: could not parse `{}` as a number\nLine {} Column {}", 
+                    text, con.line, con.column
+                )
+            }
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Context {
+    pub line: u32,
+    pub column: u32,
+}
+
+impl Context {
+    pub fn from(line: u32, col: u32) -> Self {
+        Self {
+            line: line,
+            column: col,
         }
     }
 }
@@ -298,21 +372,21 @@ mod tests {
 
     #[test]
     fn test_basic_instruction() {
-        let test_str = "\tmov $2 500\n\tadd $5 [main + 24] $10\n\tsub [50] 40 $2";
+        let test_str = "\tmov $2 500\n\tadd $5 [main + 24] $10   sub [50] 40 $2";
         let mut tokenizer = Lexer::new();
         let tokens = tokenizer.tokenize(test_str).unwrap();
         assert_eq!(tokens, vec![
-            Token::Opcode(Opcode::Mov),
-            Token::Register(2),
-            Token::NumLiteral(500),
-            Token::Opcode(Opcode::Add),
-            Token::Register(5),
-            Token::Pointer(String::from("main + 24")),
-            Token::Register(10),
-            Token::Opcode(Opcode::Sub),
-            Token::Pointer(String::from("50")),
-            Token::NumLiteral(40),
-            Token::Register(2),
+            Token::Opcode(Opcode::Mov, tokens[0].context()),
+            Token::Register(2, tokens[1].context()),
+            Token::NumLiteral(500, tokens[2].context()),
+            Token::Opcode(Opcode::Add, tokens[3].context()),
+            Token::Register(5, tokens[4].context()),
+            Token::Pointer(String::from("main + 24"), tokens[5].context()),
+            Token::Register(10, tokens[6].context()),
+            Token::Opcode(Opcode::Sub, tokens[7].context()),
+            Token::Pointer(String::from("50"), tokens[8].context()),
+            Token::NumLiteral(40, tokens[9].context()),
+            Token::Register(2, tokens[10].context()),
         ])
     }
 
@@ -322,9 +396,9 @@ mod tests {
         let mut tokenizer = Lexer::new();
         let tokens = tokenizer.tokenize(test_str).unwrap();
         assert_eq!(tokens, vec![
-            Token::LabelDeclStart(String::from("string")),
-            Token::StrLiteral(String::from("hello")),
-            Token::LabelDeclEnd
+            Token::LabelDeclStart(String::from("string"), tokens[0].context()),
+            Token::StrLiteral(String::from("hello"), tokens[1].context()),
+            Token::LabelDeclEnd(tokens[2].context())
         ])
     }
 
@@ -334,14 +408,14 @@ mod tests {
         let mut lexer = Lexer::new();
         let tokens = lexer.tokenize(test_str).unwrap();
         assert_eq!(tokens, vec![
-            Token::LabelDeclStart(String::from("label")),
-            Token::Opcode(Opcode::Mov),
-            Token::Register(3),
-            Token::NumLiteral(500),
-            Token::LabelDeclEnd,
-            Token::Opcode(Opcode::Mov),
-            Token::Register(5),
-            Token::LabelUse(String::from("label"))
+            Token::LabelDeclStart(String::from("label"), tokens[0].context()),
+            Token::Opcode(Opcode::Mov, tokens[1].context()),
+            Token::Register(3, tokens[2].context()),
+            Token::NumLiteral(500, tokens[3].context()),
+            Token::LabelDeclEnd(tokens[4].context()),
+            Token::Opcode(Opcode::Mov, tokens[5].context()),
+            Token::Register(5, tokens[6].context()),
+            Token::LabelUse(String::from("label"), tokens[7].context())
         ])
     }
 
@@ -350,7 +424,7 @@ mod tests {
         let test_str = "{";
         let mut lexer = Lexer::new();
         let res = lexer.tokenize(test_str);
-        assert_eq!(Err(AsmLexErr::UnexpectedToken(String::from("{"))), res)
+        assert_eq!(Err(AsmLexErr::UnexpectedToken(String::from("{"), Context::from(1,1))), res)
     }
 
     #[test]
@@ -359,9 +433,9 @@ mod tests {
         let mut lexer = Lexer::new();
         let tokens = lexer.tokenize(test_str).unwrap();
         assert_eq!(tokens, vec![
-            Token::LabelDeclStart(String::from("label")),
-            Token::StrLiteral(String::from("say \"hello world!\"")),
-            Token::LabelDeclEnd,
+            Token::LabelDeclStart(String::from("label"), tokens[0].context()),
+            Token::StrLiteral(String::from("say \"hello world!\""), tokens[1].context()),
+            Token::LabelDeclEnd(tokens[2].context()),
         ])
     }
 }
