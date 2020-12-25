@@ -106,6 +106,18 @@ impl VM {
                 self.heap.resize(target, 0);
                 Ok(false)
             }
+            Opcode::Push => {
+                unimplemented!("Calling conventions not yet specified")
+            }
+            Opcode::Pop => {
+                unimplemented!("Calling conventions not yet specified")
+            }
+            Opcode::Call => {
+                unimplemented!("Calling conventions not yet specified")
+            }
+            Opcode::Ret => {
+                unimplemented!("Calling conventions not yet specified")
+            }
             Opcode::Dalc => {
                 unimplemented!()
             }
@@ -122,16 +134,15 @@ impl VM {
                 unimplemented!()
             }
             Opcode::Igl => {
-                eprintln!("Illegal opcode");
                 return Err(VMError::IglOpcode)
             }
             oc @ _ => {
-                eprintln!("{:?} opcode not yet supported", oc);
-                return Err(VMError::Unsupported)
+                unimplemented!("{:?} opcode not yet supported", oc)
             }
         }
     }
 
+    #[inline]
     fn decode_opcode(&mut self) -> Opcode {
         let opcode = Opcode::from(self.program[self.pc]);
         self.pc += 1;
@@ -201,12 +212,29 @@ impl VM {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum VMError {
     IglOpcode,
     SegFault,
     OpcodeErr,
-    Unsupported,
+}
+
+impl std::error::Error for VMError {}
+
+impl std::fmt::Display for VMError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            Self::IglOpcode => {
+                write!(f, "VM Error: illegal opcode encountered")
+            }
+            Self::SegFault => {
+                write!(f, "VM Error: illegal memory access")
+            }
+            Self::OpcodeErr => {
+                write!(f, "VM Error: error while processing opcode")
+            }
+        }
+    }
 }
 
 #[cfg(test)]
