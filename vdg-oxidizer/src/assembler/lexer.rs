@@ -44,7 +44,7 @@ impl<'a> Lexer<'a> {
                         tokens.push(Token::NumLiteral(num, self.context))
                     } else {
                         tokens.push(
-                            Token::Opcode(self.consume_opcode(&buffer).ok_or(
+                            Token::Opcode(self.consume_opcode(buffer.clone()).ok_or(
                                 AsmParseErr::UnexpectedToken(buffer.clone(), self.context)
                             )?, self.context)
                         );
@@ -104,7 +104,7 @@ impl<'a> Lexer<'a> {
                             tokens.push(Token::NumLiteral(num, self.context))
                         } else {
                             tokens.push(
-                                Token::Opcode(self.consume_opcode(&buffer).ok_or(
+                                Token::Opcode(self.consume_opcode(buffer.clone()).ok_or(
                                     AsmParseErr::UnexpectedToken(buffer.clone(), self.context)
                                 )?, self.context)
                             );
@@ -124,13 +124,14 @@ impl<'a> Lexer<'a> {
         Ok(tokens)
     }
 
-    pub fn consume_opcode(&mut self, code: &str) -> Option<Opcode> {
-        let token = match code {
+    pub fn consume_opcode(&mut self, code: String) -> Option<Opcode> {
+        let token = match code.to_lowercase().as_str() {
             "hlt"  => Some(Opcode::Hlt),
             "mov"  => Some(Opcode::Mov),
             "jmp"  => Some(Opcode::Jmp),
             "jmpf" => Some(Opcode::Jmpf),
             "jmpb" => Some(Opcode::Jmpb),
+
             "cmp"  => Some(Opcode::Cmp),
             "lt"   => Some(Opcode::Lt),
             "gt"   => Some(Opcode::Gt),
@@ -138,12 +139,33 @@ impl<'a> Lexer<'a> {
             "ge"   => Some(Opcode::Ge),
             "jeq"  => Some(Opcode::Jeq),
             "jne"  => Some(Opcode::Jne),
+
             "aloc" => Some(Opcode::Aloc),
             "dalc" => Some(Opcode::Dalc),
+
+            "push" => Some(Opcode::Push),
+            "pop"  => Some(Opcode::Pop),
+            "call" => Some(Opcode::Call),
+            "ret"  => Some(Opcode::Ret),
+
+            "prt"  => Some(Opcode::Prt),
+            "open" => Some(Opcode::Open),
+            "clse" => Some(Opcode::Clse),
+            "read" => Some(Opcode::Read),
+            "wrt"  => Some(Opcode::Wrt),
+
+            "inc"  => Some(Opcode::Inc),
+            "dec"  => Some(Opcode::Dec),
             "add"  => Some(Opcode::Add),
             "sub"  => Some(Opcode::Sub),
             "mul"  => Some(Opcode::Mul),
             "div"  => Some(Opcode::Div),
+            "and"  => Some(Opcode::And),
+            "not"  => Some(Opcode::Not),
+            "or"   => Some(Opcode::Or),
+            "xor"  => Some(Opcode::Xor),
+            "bsl"  => Some(Opcode::Bsl),
+            "bsr"  => Some(Opcode::Bsr),
             _      => None,
         };
         token
@@ -155,12 +177,12 @@ impl<'a> Lexer<'a> {
             let c = self.code.next();
             self.context.column += 1;
             if c == None || c.unwrap().is_whitespace() {
-                return Ok(Token::Register(self.parse_as_register(&buf)?, self.context))
-            } else if let Some(c) = c {
-                if c == '\n' {
+                if let Some('\n') = c {
                     self.context.line += 1;
                     self.context.column = 1;
                 }
+                return Ok(Token::Register(self.parse_as_register(&buf)?, self.context))
+            } else if let Some(c) = c {
                 buf.push(c);
             }
         }
@@ -189,12 +211,12 @@ impl<'a> Lexer<'a> {
             let c = self.code.next();
             self.context.column += 1;
             if c == None || c.unwrap().is_whitespace() {
-                return Ok(Token::LabelUse(buf, self.context))
-            } else if let Some(c) = c {
-                if c == '\n' {
+                if let Some('\n') = c {
                     self.context.line += 1;
                     self.context.column = 1;
                 }
+                return Ok(Token::LabelUse(buf, self.context))
+            } else if let Some(c) = c {
                 buf.push(c);
             }
         }
@@ -232,12 +254,12 @@ impl<'a> Lexer<'a> {
             let c = self.code.next();
             self.context.column += 1;
             if c == None || c.unwrap().is_whitespace() {
-                return Ok(Token::Directive(Directive::try_from(buf, self.context)?, self.context))
-            } else if let Some(c) = c {
-                if c == '\n' {
+                if let Some('\n') = c {
                     self.context.line += 1;
                     self.context.column = 1;
                 }
+                return Ok(Token::Directive(Directive::try_from(buf, self.context)?, self.context))
+            } else if let Some(c) = c {
                 buf.push(c);
             }
         }
@@ -262,7 +284,7 @@ impl<'a> Lexer<'a> {
                 return Ok(Token::NumLiteral(num, self.context))
             } else {
                 return Ok(
-                    Token::Opcode(self.consume_opcode(&last).ok_or(
+                    Token::Opcode(self.consume_opcode(last.clone()).ok_or(
                         AsmParseErr::UnexpectedToken(last, self.context)
                     )?, self.context)
                 );
