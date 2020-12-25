@@ -4,10 +4,10 @@ LIT: Literal value, no sigil
 LAB: Label, is text
 
 hlt  none
-mov  [REG] [LIT|PTR|REG]
+mov  [PTR|REG] [LIT|PTR|REG]
 jmp  [LIT|PTR|LAB]
-jmpf [LIT]
-jmpb [LIT]
+jmpf [REG|LIT]
+jmpb [REG|LIT]
 cmp  [REG|LIT] [REG|LIT]
 lt   [REG|LIT] [REG|LIT]
 gt   ""
@@ -17,10 +17,27 @@ jeq  [LIT|PTR|LAB]
 jne  ""
 aloc [LIT|PTR|REG]
 dalc [LIT|PTR|REG]
-add  [REG|LIT|PTR] [REG|LIT|PTR] [REG]
+push ???
+pop  ???
+call [LAB] ???
+ret  ??? (calling conventions not yet specified)
+prt  [LAB|PTR] (continuously writes bytes to stdout until \0)
+open ??? (file i/o conventions not yet worked out)
+clse ??? 
+read [REG|LIT] (bytes)
+wrt  [PTR] [LIT|REG]
+inc  [REG|LIT] [REG]
+dec  ""
+add  [REG|LIT] [REG|LIT] [REG]
 sub  ""
 mul  ""
 div  ""
+and  ""
+not  ""
+or   ""
+xor  ""
+bsl  ""
+bsr  ""
 igl  none
 
 How registers, pointers and literals are denoted in memory
