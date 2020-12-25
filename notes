@@ -43,4 +43,15 @@ any code not in a function gets directly executed (like python)
 
 VM Notes:
 
-Add support for distinguishing between literals and pointers as opcode operands
+Pad all instructions to a predetermined size?
+
+TODO:
+- Implement the rest of the opcodes in the parser
+- Implement label parsing
+- Implement the assembler
+- Implement calling conventions for stack
+- Implement pointer conventions
+- Write tests for:
+    - Parser
+    - Assembler
+    - VMMemory
