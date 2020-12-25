@@ -14,6 +14,7 @@ pub enum AsmParseErr {
     UnexpectedToken(String, Context),
     UnexpectedEOF(Context),
     IncorrectOperandNo(u8, u8, Context),
+    TooManyOperands(Context),
     InvalidRegister(u32, Context),
     CouldNotParse(String, Context),
     InvalidDirective(String, Context),
@@ -55,6 +56,12 @@ impl fmt::Display for AsmParseErr {
                     num, con.line, con.column
                 )
             }
+            Self::TooManyOperands(con) => {
+                write!(f, 
+                    "Error: too many operands; expected at most 3\nLine {} Column {}",
+                    con.line, con.column
+                )
+            }
             Self::CouldNotParse(text, con) => {
                 write!(f, 
                     "Error: could not parse `{}` as a number\nLine {} Column {}", 
@@ -63,7 +70,7 @@ impl fmt::Display for AsmParseErr {
             }
             Self::InvalidDirective(dir, con) => {
                 write!(f, 
-                    "Error: invalid directive {}\nLine {} Column {}",
+                    "Error: invalid directive {:?}\nLine {} Column {}",
                     dir, con.line, con.column
                 )
             }
