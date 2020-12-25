@@ -1,3 +1,5 @@
+use byteorder::*;
+
 use crate::assembler::Operand;
 
 #[non_exhaustive]
@@ -137,8 +139,17 @@ impl Instruction {
     }
 
     pub fn to_bytes(self) -> Vec<u8> {
+        let mut bytes = Vec::<u8>::new();
+        bytes.push(self.inst as u8);
         unimplemented!()
     }
+}
+
+fn i32_to_bytes(num: i32) -> [u8; 4] {
+    let mut buf: [u8; 4] = [0, 0, 0, 0];
+    buf.as_mut().write_i32::<LittleEndian>(num).unwrap();
+
+    buf
 }
 
 #[cfg(test)]
