@@ -3,11 +3,11 @@ use byteorder::*;
 
 use crate::vm::instruction::Opcode;
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, Clone)]
 pub struct VM {
     registers: [i32; 32],
     program: Vec<u8>,
-    heap: Vec<u8>,
+    memory: VMMemory,
     pc: usize,
     remainder: i32,
     eq: bool,
@@ -18,7 +18,7 @@ impl VM {
         VM {
             registers: [0; 32],
             program: prog,
-            heap: Vec::new(),
+            memory: VMMemory::new(),
             pc: 0,
             remainder: 0,
             eq: false,
@@ -35,6 +35,7 @@ impl VM {
     }
 
     #[inline]
+    #[allow(unreachable_code)]
     fn execute(&mut self) -> Result<bool, VMError> {
         if self.pc >= self.program.len() {
             return Err(VMError::SegFault)
@@ -48,9 +49,10 @@ impl VM {
                 let register = self.next_8_bits() as usize;
                 let flag = self.next_8_bits() as usize;
                 let value = if flag == 0 {
-                    self.read_int()
+                    self.read_i32()
                 } else if flag == 1 {
-                    unimplemented!("pointer size not yet worked out")
+                    unimplemented!("pointer calling conventions not implemented");
+                    self.read_i64();
                 } else if flag == 2 {
                     self.registers[self.next_8_bits() as usize]
                 } else {
@@ -94,16 +96,16 @@ impl VM {
             Opcode::Aloc => {
                 let flag = self.next_8_bits();
                 let value = if flag == 0 {
-                    self.read_int()
+                    self.read_i32()
                 } else if flag == 1 {
-                    unimplemented!("pointer size not yet worked out")
+                    unimplemented!("pointer size not yet worked out");
+                    self.read_i64();
                 } else if flag == 2 {
                     self.registers[self.next_8_bits() as usize]
                 } else {
                     return Err(VMError::OpcodeErr)
                 };
-                let target = self.heap.len() + value as usize;
-                self.heap.resize(target, 0);
+                self.memory.allocate_heap(value as usize);
                 Ok(false)
             }
             Opcode::Push => {
@@ -158,26 +160,16 @@ impl VM {
         byte
     }
 
-    /// Gets the next 16 bits as a u16
-    fn next_16_bits(&mut self) -> u16 {
-        let res = ((self.program[self.pc] as u16) << 8) 
-            | self.program[self.pc + 1] as u16; 
-        self.pc += 2;
-
-        res
-    }
-
-    fn read_int(&mut self) -> i32 {
+    fn read_i32(&mut self) -> i32 {
         let buf: [u8; 4] = self.program[self.pc..self.pc + 4].try_into().unwrap();
         self.pc += 4;
         LittleEndian::read_i32(&buf)
     }
 
-    fn i32_to_bytes(&self, num: i32) -> [u8; 4] {
-        let mut buf: [u8; 4] = [0, 0, 0, 0];
-        buf.as_mut().write_i32::<LittleEndian>(num).unwrap();
-
-        buf
+    fn read_i64(&mut self) -> i64 {
+        let buf: [u8; 8] = self.program[self.pc..self.pc + 8].try_into().unwrap();
+        self.pc += 8;
+        LittleEndian::read_i64(&buf)
     }
 
     pub fn add_bytes(&mut self, bytes: Vec<u8>) {
@@ -199,7 +191,7 @@ impl VM {
     }
 
     pub fn heap(&self) -> usize {
-        self.heap.len()
+        self.memory.size()
     }
 
     #[cfg(test)]
@@ -237,6 +229,59 @@ impl std::fmt::Display for VMError {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct VMMemory {
+    heap: Vec<u8>,
+    stack: Vec<u8>,
+    topptr: usize,
+    baseptr: usize,
+    heap_size: usize,
+}
+
+impl VMMemory {
+    pub fn new() -> Self {
+        Self {
+            heap: Vec::new(),
+            stack: Vec::new(),
+            topptr: 0,
+            baseptr: 0,
+            heap_size: 0,
+        }
+    }
+
+    pub fn allocate_heap(&mut self, size: usize) -> usize {
+        let target = self.heap.len() + size;
+        self.heap.resize(target, 0);
+        self.heap_size = target;
+        target
+    }
+
+    pub fn allocate_stack(&mut self, size: usize) -> (usize, usize) {
+        let target = self.topptr + size;
+        self.stack.resize(target, 0);
+        self.topptr += size;
+        assert!(self.stack.len() == self.topptr, "SP and stack size mismatch");
+        (self.baseptr, self.topptr)
+    }
+
+    pub fn push_stack(&mut self, size: usize) -> (usize, usize) {
+        self.allocate_stack(size);
+        //todo: save baseptr to top of stack
+        self.baseptr += size;
+        (self.baseptr, self.topptr)
+    }
+
+    pub fn pop_stack(&mut self) -> (usize, usize) {
+        unimplemented!(
+            "need to implement saving base ptr first"
+        )
+    }
+
+    pub fn size(&self) -> usize {
+        self.heap_size + self.topptr
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -246,7 +291,7 @@ mod tests {
         assert_eq!(VM {
             registers: [0; 32], 
             program: vec![],
-            heap: vec![],
+            memory: VMMemory::new(),
             pc: 0,
             remainder: 0,
             eq: false,
