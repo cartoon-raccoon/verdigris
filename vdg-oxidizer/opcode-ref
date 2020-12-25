@@ -1,7 +1,7 @@
 REG: Register, denoted with $
 PLT: Pointer to memory, enclosed with [ ]
 LIT: Literal value, no sigil
-LAB: Label, is text
+LAB: Label, is text prepended with @ sigil
 
 hlt  none
 mov  [PTR|REG] [LIT|PTR|REG]
@@ -46,7 +46,7 @@ How registers, pointers and literals are denoted in memory
     If there is only one possible operand, the VM skips this step
 3. byte value:
     0 -> literal (i32)
-    1 -> pointer (usize) (labels get replaced with pointers at assembly)
+    1 -> pointer (i64) (negative -> heap, positive -> stack)
     2 -> register (u8)
     _ -> (throws error)
 4. VM parses next few bytes as necessary
@@ -54,4 +54,9 @@ How registers, pointers and literals are denoted in memory
 Directives: Instructions to the assembler
 Begin with '.'
 
-.str -> Reserves a string
+.string -> Reserves a string
+
+Labels: Regions of code or data that can be pointed to by a text reference
+The assembler decides if a label is code or data, and will mark it accordingly
+
+Labels get replaced with pointers at assembly
